@@ -14,15 +14,19 @@
 #include "user_config.h"
 #include "upgrade.h"
 
-
+extern MQTT_Client mqttClient;
+extern uint8 pub_topic[50],dev_sid[15];;
 void ICACHE_FLASH_ATTR ota_finished_callback(void* arg)
 {
+	uint8 buff[100];
 	 struct upgrade_server_info *update = arg;
 	    if (update->upgrade_flag == true){
 	        os_printf("OTA  Success ! rebooting!\n");
 	        system_upgrade_reboot();
 	    }else{
 	        os_printf("OTA failed!\n");
+	        os_sprintf(buff,"{\"cmd\":\"wifi_switch_updatefail_ack\",\"sid\":\"%s\"}",dev_sid);
+	        MQTT_Publish(&mqttClient,  pub_topic,buff, os_strlen(buff), 0, 0);
 	    }
 }
 
