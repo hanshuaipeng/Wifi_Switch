@@ -31,6 +31,8 @@
 
 #include "driver/key.h"
 
+uint8 longpass_flag=0;
+
 LOCAL void key_intr_handler(void *arg);
 
 /******************************************************************************
@@ -108,6 +110,7 @@ key_5s_cb(struct single_key_param *single_key)
     if (0 == GPIO_INPUT_GET(GPIO_ID_PIN(single_key->gpio_id))) {
         if (single_key->long_press) {
             single_key->long_press();
+            longpass_flag=1;
         }
     }
 }

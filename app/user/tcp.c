@@ -66,7 +66,7 @@ void ICACHE_FLASH_ATTR WIFIAPInit()
 	  apConfig.ssid_len=0;                      //设置ssid长度
 	  os_memset(apConfig.ssid,' ',strlen(apConfig.ssid));
 
-	  os_sprintf(apConfig.ssid,"grasp_socket-%s",dev_sid);			//设置ssid名字
+	  os_sprintf(apConfig.ssid,"grasp_switch-%s",dev_sid);			//设置ssid名字
 
 	 // os_strcpy(apConfig.password,"12345678");  //设置密码
 	 // apConfig.authmode =3;                     //设置加密模式
