@@ -31,7 +31,7 @@
 #include "tcp.h"
 #include "ota.h"
 /**********************************************************************/
-#define SYS_VER  			"1.3"//版本号
+#define SYS_VER  			"1.0"//版本号
 
 
 #define DEVICE_TYPE 		"gh_9e2cff3dfa51" //wechat public number
@@ -39,17 +39,6 @@
 
 #define DEFAULT_LAN_PORT 	12476
 
-/*#define SMART_LED_PIN_NUM         14
-#define SMART_LED_PIN_FUNC        FUNC_GPIO14
-#define SMART_LED_PIN_MUX         PERIPHS_IO_MUX_MTMS_U
-
-#define SMART_KEY_PIN_NUM         12
-#define SMART_KEY_PIN_FUNC        FUNC_GPIO12
-#define SMART_KEY_PIN_MUX         PERIPHS_IO_MUX_MTDI_U
-
-#define RELAY_PIN_NUM         	  4
-#define RELAY_PIN_FUNC        	  FUNC_GPIO4
-#define RELAY_PIN_MUX         	  PERIPHS_IO_MUX_GPIO4_U
 */
 //GPIO16->左侧按键->GPIO2
 //GPIO14->右侧按键->GPIO5
@@ -144,11 +133,7 @@ static struct keys_param switch_param;
 static struct single_key_param *switch_signle;
 
 char temp_str[30];    // 临时子串，查找字符串相关
-#if smartconfig
-	uint8_t  lan_buf[200];
-	uint16_t lan_buf_len;
-	uint8 	 udp_sent_cnt = 0;
-#endif
+
 LOCAL os_timer_t pub_timer;;
 LOCAL os_timer_t check_ip_timer;
 
@@ -207,99 +192,7 @@ void sntpfn()
         //os_printf("did not get a valid time from sntp server\n");
     } else
     {
-
-/***************************获取到网络时间 后开启定时任务**********************************/
-    	if(timer_start==0)
-    	{
-    		timer_start=1;
-			os_timer_disarm(&socket_timer);
-			os_timer_setfn(&socket_timer, (os_timer_func_t *)socket_timer_callback, NULL);
-			os_timer_arm(&socket_timer, 1000, 1);//1s
-    	}
-/***********************************************************************************/
-    	os_strncpy(now_time,current_time+11,5);//保存  时：分
-    	//os_printf("current time : %s\n", now_time);
-
-    	os_strncpy(chsec,current_time+17,2);//秒
-		os_strncpy(chmin,current_time+14,2);//分
-		os_strncpy(chhour,current_time+11,2);//时
-		os_strncpy(chwday,current_time,3);//周
-#if 0
-		os_strncpy(chmday,current_time+8,2);//天
-		os_strncpy(chmon,current_time+4,3);//月
-		os_strncpy(chyear,current_time+20,4);//年
-
-		os_printf("current time : %s\n", current_time);
-
-		//月份转换
-		if(strcmp(chmon,"Jan")==0)
-		{
-			now_timedate.tm_mon=1;
-		}
-		else if(strcmp(chmon,"Feb")==0)
-		{
-			now_timedate.tm_mon=2;
-		}
-		else if(strcmp(chmon,"Mar")==0)
-		{
-			now_timedate.tm_mon=3;
-		}
-		else if(strcmp(chmon,"Apr")==0)
-		{
-			now_timedate.tm_mon=4;
-		}
-		else if(strcmp(chmon,"May")==0)
-		{
-			now_timedate.tm_mon=5;
-		}
-		else if(strcmp(chmon,"Jun")==0)
-		{
-			now_timedate.tm_mon=6;
-		}
-		else if(strcmp(chmon,"Jul")==0)
-		{
-			now_timedate.tm_mon=7;
-		}
-		else if(strcmp(chmon,"Aug")==0)
-		{
-			now_timedate.tm_mon=8;
-		}
-		else if(strcmp(chmon,"Sep")==0)
-		{
-			now_timedate.tm_mon=9;
-		}
-		else if(strcmp(chmon,"Oct")==0)
-		{
-			now_timedate.tm_mon=10;
-		}
-		else if(strcmp(chmon,"Nov")==0)
-		{
-			now_timedate.tm_mon=11;
-		}
-		else if(strcmp(chmon,"Dec")==0)
-		{
-			now_timedate.tm_mon=12;
-		}
-#endif
-
-		now_timedate.tm_hour=(chhour[0]-'0')*10+(chhour[1]-'0');
-		now_timedate.tm_min=(chmin[0]-'0')*10+(chmin[1]-'0');
-		now_timedate.tm_sec=(chsec[0]-'0')*10+(chsec[1]-'0');
-		//周转换
-		if(strcmp(chwday,"Mon")==0)
-			now_timedate.tm_wday=1+'0';
-		else if(strcmp(chwday,"Tue")==0)
-			now_timedate.tm_wday=2+'0';
-		else if(strcmp(chwday,"Wed")==0)
-			now_timedate.tm_wday=3+'0';
-		else if(strcmp(chwday,"Thu")==0)
-			now_timedate.tm_wday=4+'0';
-		else if(strcmp(chwday,"Fri")==0)
-			now_timedate.tm_wday=5+'0';
-		else if(strcmp(chwday,"Sat")==0)
-			now_timedate.tm_wday=6+'0';
-		else if(strcmp(chwday,"Sun")==0)
-			now_timedate.tm_wday=7+'0';
+    	os_printf("current time : %s\n", current_time);
     }
 
 }
@@ -538,29 +431,6 @@ smartconfig_done(sc_status status, void *pdata)
 
 
 #endif
-/******************倒计时回调******************************/
-void  ICACHE_FLASH_ATTR onoff_timer_callback()
-{
-	if(sec==0)
-	{
-		if(min==0)
-		{
-			if(down_flag==1)
-			{
-				dev_sta=1;
-			}
-			else
-				dev_sta=0;
-			on_off_flag=1;
-			min=0;
-			os_timer_disarm(&onoff_timer);
-			return;
-		}
-		sec=60;
-		min--;
-	}
-	sec--;
-}
 
 void ICACHE_FLASH_ATTR  save_flash(uint32 des_addr,uint32* data)
 {
@@ -572,86 +442,6 @@ void  ICACHE_FLASH_ATTR load_flash(uint32 des_addr,uint32* data)
 	spi_flash_read(des_addr * SPI_FLASH_SEC_SIZE,data, sizeof(data));
 }
 
-/***********************定时器******************************/
-void  ICACHE_FLASH_ATTR socket_timer_callback()
-{
-	uint8 i;
-	static uint8 count=0;
-	for(i=1;i<24;i++)
-	{
-#if time_debug
-		os_printf("timing_timersta[%d]=%s\r\n",i,timing_timersta[i]);
-#endif
-		if(strstr(timing_timersta[i],"on")!=NULL)
-		{
-			count++;
-			if(strchr(timing_day[i],now_timedate.tm_wday))
-			{
-				if(strstr(timing_ontime[i],now_time)!=NULL&&now_timedate.tm_sec==0)
-				{
-					on_off_flag=1;
-					dev_sta=1;//时间到，打开
-				}
-				if(strstr(timing_offtime[i],now_time)!=NULL&&now_timedate.tm_sec==0)
-				{
-					on_off_flag=1;
-					dev_sta=0;//时间到，关闭
-				}
-			}
-		}
-	}
-	if(count==0)
-	{
-#if 1
-		os_printf("no timer is open!!!\r\n");
-#endif
-		os_timer_disarm(&socket_timer);
-	}
-	else
-	{
-#if 0
-		os_printf("timer num is:%d\r\n",count);
-#endif
-		count=0;
-	}
-}
-
-
-
-/************************获取定时器个数********************************/
-uint8 ICACHE_FLASH_ATTR  get_timer()
-{
-	uint8 i,count=0;
-	for(i=1;i<24;i++)
-	{
-		if(strstr(wifi_socket_timing[i],"time")!=NULL)
-		{
-			count++;
-		}
-	}
-//	os_printf("count num is:%d\r\n",count);
-	return count;
-}
-/****************************拼定时器列表*************************************************/
-void ICACHE_FLASH_ATTR  send_list()
-{
-	uint8 i,count=0;
-	os_sprintf(list,"{\"cmd\":\"wifi_socket_read_timing_ack\",\"sid\":\"%s\",\"data\":[",dev_sid);
-	for(i=0;i<24;i++)
-	{
-		if(strstr(wifi_socket_timing[i],"time")!=NULL)
-		{
-			if(count>0)
-				os_strcat(list,",");
-			count++;
-			os_strcat(list,wifi_socket_timing[i]);
-		}
-	}
-	os_strcat(list,"]}");
-#if 0
-	os_printf("%s\n", list);
-#endif
-}
 /****************************************收到数据开始处理*******************************************/
 void ICACHE_FLASH_ATTR  pub_timer_callback()
 {
@@ -669,196 +459,6 @@ void ICACHE_FLASH_ATTR  pub_timer_callback()
 		os_memset(pub_buff,0,os_strlen(pub_buff));
 		if(strstr(mqtt_buff,dev_sid)!=NULL)
 		{
-			if(strstr(mqtt_buff,"\"cmd\":\"wifi_socket_count_down\"")!=NULL)//倒计时
-			{
-				frist_pos=GetSubStrPos(mqtt_buff,"\"data\":");
-
-				shi=(mqtt_buff[frist_pos+8]-'0')*10+(mqtt_buff[frist_pos+9]-'0');
-				fen=(mqtt_buff[frist_pos+11]-'0')*10+(mqtt_buff[frist_pos+12]-'0');
-				miao=(mqtt_buff[frist_pos+14]-'0')*10+(mqtt_buff[frist_pos+15]-'0');
-				min=shi*60+fen;
-				sec=miao;
-
-				if(strstr(mqtt_buff,"\"state\":\"on\"")!=NULL)
-				{
-					down_flag=1;
-					os_strcpy(state,"on");
-				}
-				if(strstr(mqtt_buff,"\"state\":\"off\"")!=NULL)
-				{
-					down_flag=0;
-					os_strcpy(state,"off");
-				}
-				if(strstr(mqtt_buff,"\"state\":\"cancel\"")!=NULL)
-				{
-					os_strcpy(state,"cancel");
-					sec=0;
-					min=0;
-					os_timer_disarm(&onoff_timer);
-				}
-				else
-				{
-					 os_timer_disarm(&onoff_timer);
-					 os_timer_setfn(&onoff_timer, (os_timer_func_t *)onoff_timer_callback, NULL);
-					 os_timer_arm(&onoff_timer, 1000, 1);//1000ms
-				}
-				os_sprintf(pub_buff,"{\"cmd\":\"wifi_socket_count_down_ack\",\"state\":\"%s\",\"data\":\"%02d,%02d,%02d\",\"sid\":\"%s\"}",state,shi,fen,miao,dev_sid);
-				if(tcp_send==1)
-				{
-					tcp_send=0;
-					WIFI_TCP_SendNews(pub_buff,os_strlen(pub_buff));
-				}
-				else
-					MQTT_Publish(&mqttClient,  pub_topic,pub_buff, os_strlen(pub_buff), 0, 0);
-			}
-/****************************获取倒计时状态**********************************/
-			if(strstr(mqtt_buff,"\"wifi_socket_read_down\"")!=NULL)
-			{
-				if(dev_sta==1)
-				{
-					os_strcpy(state,"off");
-				}
-				else
-					os_strcpy(state,"on");
-				os_sprintf(pub_buff,"{\"cmd\":\"wifi_socket_read_down_ack\",\"state\":\"%s\",\"data\":\"%02d,%02d,%02d\",\"sid\":\"%s\"}",state,min/60,min%60,sec,dev_sid);
-				if(tcp_send==1)
-				{
-					tcp_send=0;
-					WIFI_TCP_SendNews(pub_buff,os_strlen(pub_buff));
-				}
-				else
-					MQTT_Publish(&mqttClient,  pub_topic,pub_buff, os_strlen(pub_buff), 0, 0);
-			}
-/*****************************设置定时****************************************************/
-			//{"cmd":"wifi_socket_timing","day":"1234567","ontime":"10:00","offtime":"19:00","timer":1,"timer_state":"on","sid":"12345678"}
-			if(strstr(mqtt_buff,"\"cmd\":\"wifi_socket_timing\"")!=NULL)//定时器
-			{
-				frist_pos=GetSubStrPos(mqtt_buff,"\"timer\":");
-				if(mqtt_buff[frist_pos+9]>='0'&&mqtt_buff[frist_pos+9]<='9')
-				{
-					timer=(mqtt_buff[frist_pos+8]-'0')*10+(mqtt_buff[frist_pos+9]-'0');//有多少个定时
-				}
-				else
-					timer=(mqtt_buff[frist_pos+8]-'0');//有多少个定时
-
-				/******************************存定时列表******************************************/
-				//获取定时数量，如果大于20个，清空当前的定时，上传超过20
-				if(get_timer()>19&&timer==0)
-				{
-					os_memset(pub_buff,0,os_strlen(pub_buff));
-					os_sprintf(pub_buff,"{\"cmd\":\"wifi_socket_timeout_ack\",\"sid\":\"%s\"}",dev_sid);
-				}
-				else
-				{
-					if(timer==0)//代表新建的定时器
-					{
-						for(i=1;i<24;i++)
-						{
-							if(strstr(wifi_socket_timing[i],"time")==NULL)
-							{
-								timer=i;//保存新建定时的位置
-								break;
-							}
-						}
-					}
-					frist_pos=GetSubStrPos(mqtt_buff,"\"day\":");
-					os_strncpy(timing_day[timer],mqtt_buff+frist_pos+7,7);//保存第N个定时的重复的天数
-
-					if(strstr(mqtt_buff,"\"timer_state\":\"on\"")!=NULL)
-					{
-						os_strcpy(state,"\"on\"");
-						os_strcpy(timing_timersta[timer],"on");
-					}
-					else
-					{
-						os_strcpy(state,"\"off\"");
-						os_strcpy(timing_timersta[timer],"off");
-					}
-					if(strstr(mqtt_buff,"\"ontime\":\"close\"")!=NULL)
-					{
-						os_strcpy(timing_ontime[timer],"close");//
-					}
-					else
-					{
-						frist_pos=GetSubStrPos(mqtt_buff,"\"ontime\":");
-						os_strncpy(timing_ontime[timer],mqtt_buff+frist_pos+10,5);
-
-					}
-					if(strstr(mqtt_buff,"\"offtime\":\"close\"")!=NULL)
-					{
-						os_strcpy(timing_offtime[timer],"close");
-					}
-					else
-					{
-						frist_pos=GetSubStrPos(mqtt_buff,"\"offtime\":");
-						os_strncpy(timing_offtime[timer],mqtt_buff+frist_pos+11,5);
-					}
-					/*************************************开启定时任务*******************************************/
-					os_timer_disarm(&socket_timer);
-					os_timer_setfn(&socket_timer, (os_timer_func_t *)socket_timer_callback, NULL);
-					os_timer_arm(&socket_timer, 1000, 1);//1s
-
-					os_sprintf(pub_buff,"{\"cmd\":\"wifi_socket_timing_ack\",\"day\":\"%s\",\"ontime\":\"%s\",\"offtime\":\"%s\","
-							"\"timer\":%d,\"timer_state\":%s,\"sid\":\"%s\"}",timing_day[timer],timing_ontime[timer],timing_offtime[timer],timer,state,dev_sid);
-
-					os_memset(wifi_socket_timing[timer],0,os_strlen(wifi_socket_timing[timer]));
-
-					os_sprintf(wifi_socket_timing[timer],"{\"time\":\"%s,%s,%s,%s\",\"timer\":%d}",timing_ontime[timer],
-								timing_offtime[timer],timing_day[timer],timing_timersta[timer],timer);
-				}
-				if(tcp_send==1)
-				{
-					tcp_send=0;
-					WIFI_TCP_SendNews(pub_buff,os_strlen(pub_buff));
-				}
-				else
-					MQTT_Publish(&mqttClient,  pub_topic,pub_buff, os_strlen(pub_buff), 0, 0);
-
-			}
-/************************************读定时列表*****************************************************/
-			if(strstr(mqtt_buff,"\"cmd\":\"wifi_socket_read_timing\"")!=NULL)
-			{
-				send_list();
-
-				spi_flash_erase_sector(CFG_LOCATION + 5);
-				spi_flash_write((CFG_LOCATION + 5) * SPI_FLASH_SEC_SIZE,(uint32 *)list,sizeof( list));
-
-				if(tcp_send==1)
-				{
-					tcp_send=0;
-					WIFI_TCP_SendNews(list,os_strlen(list));
-				}
-				else
-					MQTT_Publish(&mqttClient,  pub_topic,list, os_strlen(list), 0, 0);
-
-			}
-/*****************************************删除定时*****************************************************/
-			if(strstr(mqtt_buff,"\"cmd\":\"wifi_socket_del_timing\"")!=NULL)
-			{
-				frist_pos=GetSubStrPos(mqtt_buff,"\"timer\":");
-				if(mqtt_buff[frist_pos+9]>='0'&&mqtt_buff[frist_pos+9]<='9')
-				{
-					timer=(mqtt_buff[frist_pos+8]-'0')*10+(mqtt_buff[frist_pos+9]-'0');//
-				}
-				else
-					timer=(mqtt_buff[frist_pos+8]-'0');//获取要删除的定时
-				/****************************全清空该定时器的状态******************************************/
-				os_memset(wifi_socket_timing[timer],0,os_strlen(wifi_socket_timing[timer]));
-				os_memset(timing_day[timer],0,os_strlen(timing_day[timer]));
-				os_memset(timing_ontime[timer],0,os_strlen(timing_ontime[timer]));
-				os_memset(timing_offtime[timer],0,os_strlen(timing_offtime[timer]));
-				os_memset(timing_timersta[timer],0,os_strlen(timing_timersta[timer]));
-
-				os_sprintf(pub_buff,"{\"cmd\":\"wifi_socket_del_timing_ack\",\"timer\":%d,\"sid\":\"%s\"}",timer,dev_sid);
-				if(tcp_send==1)
-				{
-					tcp_send=0;
-					WIFI_TCP_SendNews(pub_buff,os_strlen(pub_buff));
-				}
-				else
-					MQTT_Publish(&mqttClient,  pub_topic,pub_buff, os_strlen(pub_buff), 0, 0);
-
-			}
 /************************************读开关状态************************************************************/
 			if(strstr(mqtt_buff,"\"cmd\":\"wifi_socket_read\"")!=NULL)
 			{
@@ -1162,48 +762,6 @@ user_rf_cal_sector_set(void)
 
 void  ICACHE_FLASH_ATTR to_scan(void)
 {
-/*
-	static uint8 buff[1000]={' '},cache[1000]={' '};
-	uint8 i,frist_pos=0,len=0;
-	uint8 data=0;
-	/***************************导入flash数据并解析****************************************/
-/*	if(strstr(list,"timer")!=NULL)
-	{
-		frist_pos=GetSubStrPos(list,"[");
-		os_strncpy(buff,list+frist_pos+1,os_strlen(list)-frist_pos-1);
-		for(i=0;i<24;i++)
-		{
-			frist_pos=GetSubStrPos(buff,"timer");
-			if(buff[frist_pos+8]>='0'&&buff[frist_pos+8]<='9')
-				data=(buff[frist_pos+7]-'0')*10+(buff[frist_pos+8]-'0');
-			else
-				data=buff[frist_pos+7]-'0';
-			frist_pos=GetSubStrPos(buff,"}");
-			os_strncpy(wifi_socket_timing[data],buff,frist_pos+1);//截取一包数据{"time":"10:00,16:00,0034560,on","timer":2}
-
-			os_strncpy(timing_ontime[data],wifi_socket_timing[data]+9,5);
-			os_strncpy(timing_offtime[data],wifi_socket_timing[data]+15,5);
-			os_strncpy(timing_day[data],wifi_socket_timing[data]+21,7);
-			os_strncpy(timing_timersta[data],wifi_socket_timing[data]+29,3);
-
-			os_memset(cache,0,sizeof(cache));
-			os_strncpy(cache,buff+frist_pos+2,os_strlen(buff)-frist_pos-2);//将截取的数据存在cache中
-			os_memset(buff,0,sizeof(buff));//清空buff
-			os_strcpy(buff,cache);//将截取到的数据重新拷贝到buff
-			//os_printf("buff=%s\r\n",buff);
-
-#if time_debug
-			os_printf("wifi_socket_timing[%d]=%s\r\n",data,wifi_socket_timing[data]);
-			os_printf("timing_ontime[%d]=%s\r\n",data,timing_ontime[data]);
-			os_printf("timing_offtime[%d]=%s\r\n",data,timing_offtime[data]);
-			os_printf("timing_day[%d]=%s\r\n",data,timing_day[data]);
-			os_printf("timing_timersta[%d]=%s\r\n",data,timing_timersta[data]);
-#endif
-			len=os_strlen(buff);
-			if(len<5)
-				break;
-		}
-	}*/
 	/***************************开启任务**********************************/
 	os_timer_disarm(&pub_timer);
 	os_timer_setfn(&pub_timer, (os_timer_func_t *)pub_timer_callback, NULL);
