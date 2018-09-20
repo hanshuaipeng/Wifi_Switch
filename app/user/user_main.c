@@ -31,7 +31,7 @@
 #include "tcp.h"
 #include "ota.h"
 /**********************************************************************/
-#define SYS_VER  			"1.0"//°æ±¾ºÅ
+#define SYS_VER  			"1.1"//°æ±¾ºÅ
 
 
 #define DEVICE_TYPE 		"gh_9e2cff3dfa51" //wechat public number
@@ -40,15 +40,16 @@
 #define DEFAULT_LAN_PORT 	12476
 
 //GPIO16->×ó²à°´¼ü->GPIO2
-//GPIO14->ÓÒ²à°´¼ü->GPIO5
+//GPIO12->ÓÒ²à°´¼ü->GPIO5
+//ºìÉ«ÅäÍøÖ¸Ê¾µÆ
 #define SMART_LED_PIN_NUM         15
 #define SMART_LED_PIN_FUNC        FUNC_GPIO15
 #define SMART_LED_PIN_MUX         PERIPHS_IO_MUX_MTDO_U
-
+//ÓÒ²à°´¼ü£¬³äµ±ÅäÍø£¬×ó²à°´¼üÎ»GPIO16
 #define SMART_KEY_PIN_NUM         12
 #define SMART_KEY_PIN_FUNC        FUNC_GPIO12
 #define SMART_KEY_PIN_MUX         PERIPHS_IO_MUX_MTDI_U
-
+//¼ÌµçÆ÷
 #define RELAY1_PIN_NUM         	  2
 #define RELAY1_PIN_FUNC        	  FUNC_GPIO2
 #define RELAY1_PIN_MUX         	  PERIPHS_IO_MUX_GPIO2_U
@@ -65,6 +66,7 @@
 #define RELAY1_OFF GPIO_OUTPUT_SET(GPIO_ID_PIN(RELAY1_PIN_NUM), 0);
 #define RELAY2_ON  GPIO_OUTPUT_SET(GPIO_ID_PIN(RELAY2_PIN_NUM), 1);
 #define RELAY2_OFF GPIO_OUTPUT_SET(GPIO_ID_PIN(RELAY2_PIN_NUM), 0);
+
 LOCAL os_timer_t flash_light_timer;
 LOCAL os_timer_t keyscan_timer;
 
@@ -151,7 +153,7 @@ void sntpfn()
         //os_printf("did not get a valid time from sntp server\n");
     } else
     {
-    	os_printf("current time : %s\n", current_time);
+    	//os_printf("current time : %s\n", current_time);
     }
 
 }
@@ -232,7 +234,7 @@ void mqttDataCb(uint32_t *args, const char* topic, uint32_t topic_len, const cha
     os_memcpy(mqtt_buff, data, data_len);
     dataBuf[data_len] = 0;
     pub_flag=1;
-#if 0
+#if 1
     INFO("Receive topic: %s, data: %s \r\n", topicBuf, dataBuf);
 #endif
     os_free(topicBuf);
@@ -434,7 +436,7 @@ void ICACHE_FLASH_ATTR  pub_timer_callback()
 				}
 				else
 					MQTT_Publish(&mqttClient,  pub_topic,pub_buff, os_strlen(pub_buff), 0, 0);
-				ota_start_Upgrade(ip, 80,"8266update/");
+				ota_start_Upgrade(ip, 80,"8266update/WiFi_Switch/");
 			}
 /*********************************************»ñÈ¡IP*************************/
 			if(strstr(mqtt_buff,"\"cmd\":\"wifi_switch_ping\"")!=NULL)
