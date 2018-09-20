@@ -31,8 +31,8 @@
 #include "tcp.h"
 #include "ota.h"
 /**********************************************************************/
-#define SYS_VER  			"1.1"//版本号
-
+#define SYS_VER  			"gp08-cz01-sw-v1.3"//版本号
+#define HARD_VER  			"gp08-cz01-hw-v1.3"//版本号
 
 #define DEVICE_TYPE 		"gh_9e2cff3dfa51" //wechat public number
 #define DEVICE_ID 			"122475" //model ID
@@ -185,8 +185,8 @@ void ICACHE_FLASH_ATTR  wifiConnectCb(uint8_t status)
 
 void mqttConnectedCb(uint32_t *args)
 {
-	uint8 init_buff[50];
-	os_sprintf(init_buff,"{\"cmd\":\"i am ok\",\"dev\":\"switch\",\"sys_ver\":\"%s\",\"sid\":\"%s\"}",SYS_VER,dev_sid);
+	uint8 init_buff[200];
+	os_sprintf(init_buff,"{\"cmd\":\"i am ok\",\"dev\":\"switch\",\"sys_ver\":\"%s\",\"hard_ver\":\"%s\",\"sid\":\"%s\"}",SYS_VER,HARD_VER,dev_sid);
     MQTT_Client* client = (MQTT_Client*)args;
 #if 1
     INFO("MQTT: Connected\r\n");
@@ -439,9 +439,9 @@ void ICACHE_FLASH_ATTR  pub_timer_callback()
 				ota_start_Upgrade(ip, 80,"8266update/WiFi_Switch/");
 			}
 /*********************************************获取IP*************************/
-			if(strstr(mqtt_buff,"\"cmd\":\"wifi_switch_ping\"")!=NULL)
+			if(strstr(mqtt_buff,"\"cmd\":\"wifi_equipment_ping\"")!=NULL)
 			{
-				os_sprintf(pub_buff,"{\"cmd\":\"wifi_switch_ping_ack\",\"ip\":\"%s\",\"sid\":\"%s\"}",local_ip,dev_sid);
+				os_sprintf(pub_buff,"{\"cmd\":\"wifi_equipment_ping_ack\",\"ip\":\"%s\",\"sid\":\"%s\"}",local_ip,dev_sid);
 				MQTT_Publish(&mqttClient,  pub_topic,pub_buff, os_strlen(pub_buff), 0, 0);
 			}
 /************************************开关*****************************************/
@@ -498,7 +498,7 @@ void ICACHE_FLASH_ATTR  pub_timer_callback()
 			RELAY2_ON;
 		}
 
-		os_sprintf(pub_buff,"{\"cmd\":\"wifi_switch_ack\",\"channel_1\":%s,\"channel_2\":%s,\"sys_ver\":\"%s\",\"sid\":\"%s\"}",state1,state2,SYS_VER,dev_sid);
+		os_sprintf(pub_buff,"{\"cmd\":\"wifi_switch_ack\",\"channel_1\":%s,\"channel_2\":%s,\"sys_ver\":\"%s\",\"hard_ver\":\"%s\",\"sid\":\"%s\"}",state1,state2,SYS_VER,HARD_VER,dev_sid);
 		if(tcp_send==1)
 		{
 			tcp_send=0;
@@ -822,6 +822,7 @@ void user_init(void)
    	system_init_done_cb(to_scan);
 	INFO("\r\nSystem started ...\r\n");
 	os_printf("SYS_Ver is %s\r\n",SYS_VER);
+	os_printf("Hard_Ver is %s\r\n",HARD_VER);
 }
 
 
