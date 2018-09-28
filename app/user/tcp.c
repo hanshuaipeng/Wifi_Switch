@@ -116,12 +116,17 @@ void ICACHE_FLASH_ATTR TcpServer_Listen_Recv(void *arg, char *pdata, unsigned sh
 		 WIFI_Connect(ssid,password,wifiConnectCb);
 
 	}
+	else if(pdata[0]=='0'&&pdata[1]=='0')
+	{
+		WIFI_TCP_SendNews("00",2);
+	}
 	else
 	{
 		os_strcpy(mqtt_buff,pdata);
 		pub_flag=1;
 		tcp_send=1;
 	}
+	os_memset(pdata,0,os_strlen(pdata));
 }
 /*
  * 函数名:void TcpServer_Listen_Recb(void *arg, sint8 errType)
@@ -246,4 +251,5 @@ void ICACHE_FLASH_ATTR station_server_init(struct ip_addr *local_ip,int port){
     espconn_regist_connectcb(&esp_conn,TcpServerListen_PCon);//注册一个连接成功回调函数
 
     espconn_accept(&esp_conn);
+	 espconn_regist_time(&esp_conn,60,0);//设置tcp超时时间，60S后与不通信的客户端断开连接
 }

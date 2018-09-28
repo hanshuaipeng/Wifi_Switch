@@ -31,8 +31,8 @@
 #include "tcp.h"
 #include "ota.h"
 /**********************************************************************/
-#define SYS_VER  			"gp08-cz01-sw-v1.3"//版本号
-#define HARD_VER  			"gp08-cz01-hw-v1.3"//版本号
+#define SYS_VER  			"gp08-kg01-sw-v1.6"//版本号
+#define HARD_VER  			"gp08-kg01-hw-v1.3"//版本号
 
 #define DEVICE_TYPE 		"gh_9e2cff3dfa51" //wechat public number
 #define DEVICE_ID 			"122475" //model ID
@@ -595,7 +595,7 @@ void gpio_init(void)
 {
 	 PIN_FUNC_SELECT(SMART_LED_PIN_MUX,SMART_LED_PIN_FUNC);//LED
 	 PIN_FUNC_SELECT(RELAY1_PIN_MUX,RELAY1_PIN_FUNC);//RELAY1
-	 PIN_FUNC_SELECT(RELAY2_PIN_MUX,RELAY2_PIN_FUNC);//RELAY1
+	 PIN_FUNC_SELECT(RELAY2_PIN_MUX,RELAY2_PIN_FUNC);//RELAY2
 	 //按键配置
 	switch_signle = key_init_single( SMART_KEY_PIN_NUM, SMART_KEY_PIN_MUX,
 									 SMART_KEY_PIN_FUNC,
@@ -810,9 +810,10 @@ void user_init(void)
 
 	gpio_init();
 
-	load_flash(CFG_LOCATION + 4,(uint32 *)&channel_sta);
+	load_flash(CFG_LOCATION + 4,(uint32 *)channel_sta);
 
 	on_off_flag=1;
+	
 
  //检测到连接ip之后连接mqtt
 	check_ip();
