@@ -28,10 +28,14 @@
 * POSSIBILITY OF SUCH DAMAGE.
 */
 #include "user_config.h"
-#include "tcp.h"
 #include "ota.h"
+#if tcp_server
+	#include "tcp.h"
+#else
+	#include "udp_server.h"
+#endif
 /**********************************************************************/
-#define SYS_VER  			"gp08-kg01-sw-v1.6"//版本号
+#define SYS_VER  			"gp08-kg01-sw-v1.3"//版本号
 #define HARD_VER  			"gp08-kg01-hw-v1.3"//版本号
 
 #define DEVICE_TYPE 		"gh_9e2cff3dfa51" //wechat public number
@@ -392,7 +396,57 @@ smartconfig_done(sc_status status, void *pdata)
 
 
 #endif
+/*
+ * 函数名:void dhcps_lease()
+ * 功能:分配ip范围
+ */
+void ICACHE_FLASH_ATTR dhcps_lease(void)
+{
 
+	struct	dhcps_lease	dhcp_lease;
+	struct ip_info info;
+	wifi_softap_dhcps_stop();//设置前关闭DHCP
+	IP4_ADDR(&dhcp_lease.start_ip,192,168,5,1);
+
+	IP4_ADDR(&dhcp_lease.end_ip,192,168,5,100);
+
+	IP4_ADDR(&info.ip, 192, 168, 5, 1);
+	IP4_ADDR(&info.gw, 192, 168, 5, 1);
+	IP4_ADDR(&info.netmask, 255, 255, 255, 0);
+	wifi_set_ip_info(SOFTAP_IF, &info);
+
+	wifi_softap_set_dhcps_lease(&dhcp_lease);
+	wifi_softap_dhcps_start();
+
+}
+/*
+ * 函数名:void Wifi_AP_Init()
+ * 功能wifi_ap初始化
+ */
+void ICACHE_FLASH_ATTR WIFIAPInit()
+{
+    struct softap_config apConfig;
+
+    /***************************模式设置************************************/
+         if(wifi_set_opmode(0x03)){          //  设置为AP模式
+
+         }else{
+
+         }
+    /***************************名字设通道置************************************/
+	  os_bzero(&apConfig, sizeof(struct softap_config));
+	  wifi_softap_get_config(&apConfig);
+	  apConfig.ssid_len=0;                      //设置ssid长度
+	  os_memset(apConfig.ssid,' ',strlen(apConfig.ssid));
+
+	  os_sprintf(apConfig.ssid,"grasp_switch-%s",dev_sid);			//设置ssid名字
+
+	 // os_strcpy(apConfig.password,"12345678");  //设置密码
+	 // apConfig.authmode =3;                     //设置加密模式
+	  wifi_softap_set_config(&apConfig);        //配置
+
+	  dhcps_lease();
+}
 void ICACHE_FLASH_ATTR  save_flash(uint32 des_addr,uint32* data)
 {
 	spi_flash_erase_sector(des_addr);
@@ -432,7 +486,11 @@ void ICACHE_FLASH_ATTR  pub_timer_callback()
 				if(tcp_send==1)
 				{
 					tcp_send=0;
+#if tcp_server
 					WIFI_TCP_SendNews(pub_buff,os_strlen(pub_buff));
+#else
+					WIFI_UDP_SendNews(pub_buff,os_strlen(pub_buff));
+#endif
 				}
 				else
 					MQTT_Publish(&mqttClient,  pub_topic,pub_buff, os_strlen(pub_buff), 0, 0);
@@ -503,7 +561,11 @@ void ICACHE_FLASH_ATTR  pub_timer_callback()
 		{
 			tcp_send=0;
 
+#if tcp_server
 			WIFI_TCP_SendNews(pub_buff,os_strlen(pub_buff));
+#else
+			WIFI_UDP_SendNews(pub_buff,os_strlen(pub_buff));
+#endif
 			//***************************向服务器**************************************/
 			if(abc==1)
 			{
@@ -539,7 +601,8 @@ void ICACHE_FLASH_ATTR  flash_light_timer_callback()
 //长按按键开始配网
 static void Switch_LongPress_Handler( void )
 {
-
+	struct ip_info ipConfig;
+	static uint8 ip[10];
 #if smartconfig
 		wifi_station_dhcpc_start();
 		smartconfig_set_type(SC_TYPE_ESPTOUCH_AIRKISS); //SC_TYPE_ESPTOUCH,SC_TYPE_AIRKISS,SC_TYPE_ESPTOUCH_AIRKISS
@@ -558,8 +621,11 @@ static void Switch_LongPress_Handler( void )
 		MQTT_Disconnect(&mqttClient);
 		os_delay_us(60000);
 		WIFIAPInit();
-
+#if tcp_server
 	    WIFIServerMode();
+#else
+	    udp_server_init(8888,&ipConfig.ip,1);
+#endif
 	    os_printf("long pass \n");
 
 }
@@ -676,26 +742,34 @@ void  ICACHE_FLASH_ATTR MQTT_Init()
 /*************************************脸上wifi后检测IP*******************************************/
 void  ICACHE_FLASH_ATTR check_ip_timer_callback()
 {
-	static uint8_t wifiStatus = STATION_IDLE;
+	static uint8_t wifiStatus = STATION_IDLE,flag=0;
 	struct ip_info ipConfig;
 	uint8 ip[10];
+
 	wifi_get_ip_info(STATION_IF, &ipConfig);
 	wifiStatus = wifi_station_get_connect_status();
 	if (wifiStatus == STATION_GOT_IP && ipConfig.ip.addr != 0)
 	{
-		Smart_LED_ON;
-		wifi_set_opmode(0x01);
-		 my_sntp_init();//获取网络时间
+		if(flag==1)
+		{
+			flag=0;
+			wifi_set_opmode(0x01);
+			 my_sntp_init();//获取网络时间
+#if tcp_server
+			 station_server_init(&ipConfig.ip,8888);
+#else
+			 udp_server_init(8888,&ipConfig.ip,0);
+#endif
+			 os_memcpy(ip,&ipConfig.ip,4);
 
-		 station_server_init(&ipConfig.ip,8888);
-		 os_memcpy(ip,&ipConfig.ip,4);
+			 os_sprintf(local_ip,"%d.%d.%d.%d",ip[0],ip[1],ip[2],ip[3]);
 
-		 os_sprintf(local_ip,"%d.%d.%d.%d",ip[0],ip[1],ip[2],ip[3]);
-
-		 MQTT_Connect(&mqttClient);
-		 os_timer_disarm(&check_ip_timer);
+			 MQTT_Connect(&mqttClient);
+		}
+		 //os_timer_disarm(&check_ip_timer);
 	}
-
+	else
+		flag=1;
 }
 
 void  ICACHE_FLASH_ATTR check_ip()

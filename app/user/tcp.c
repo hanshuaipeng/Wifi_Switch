@@ -46,34 +46,7 @@ extern uint8 pub_flag;
 
 uint8 tcp_send=0;
 //os_event_t    procTaskQueue[procTaskQueueLen];
-/*
- * 函数名:void Wifi_AP_Init()
- * 功能wifi_ap初始化
- */
-void ICACHE_FLASH_ATTR WIFIAPInit()
-{
-    struct softap_config apConfig;
 
-    /***************************模式设置************************************/
-         if(wifi_set_opmode(0x03)){          //  设置为AP模式
-
-         }else{
-
-         }
-    /***************************名字设通道置************************************/
-	  os_bzero(&apConfig, sizeof(struct softap_config));
-	  wifi_softap_get_config(&apConfig);
-	  apConfig.ssid_len=0;                      //设置ssid长度
-	  os_memset(apConfig.ssid,' ',strlen(apConfig.ssid));
-
-	  os_sprintf(apConfig.ssid,"grasp_switch-%s",dev_sid);			//设置ssid名字
-
-	 // os_strcpy(apConfig.password,"12345678");  //设置密码
-	 // apConfig.authmode =3;                     //设置加密模式
-	  wifi_softap_set_config(&apConfig);        //配置
-
-	  dhcps_lease();
-}
 /*
  *函数名:void TcpServer_Listen_Recv(void *arg, char *pdata, unsigned short len)
  *功能:接收监听函数
@@ -184,30 +157,6 @@ void ICACHE_FLASH_ATTR ICACHE_FLASH_ATTR TcpServerListen_PCon(void *arg)
       os_printf("连接已经成功\r\n");
 #endif
 }
-/*
- * 函数名:void dhcps_lease()
- * 功能:分配ip范围
- */
-void ICACHE_FLASH_ATTR dhcps_lease(void)
-{
-
-	struct	dhcps_lease	dhcp_lease;
-	struct ip_info info;
-	wifi_softap_dhcps_stop();//设置前关闭DHCP
-	IP4_ADDR(&dhcp_lease.start_ip,192,168,5,1);
-
-	IP4_ADDR(&dhcp_lease.end_ip,192,168,5,100);
-
-	IP4_ADDR(&info.ip, 192, 168, 5, 1);
-	IP4_ADDR(&info.gw, 192, 168, 5, 1);
-	IP4_ADDR(&info.netmask, 255, 255, 255, 0);
-	wifi_set_ip_info(SOFTAP_IF, &info);
-
-	wifi_softap_set_dhcps_lease(&dhcp_lease);
-	wifi_softap_dhcps_start();
-
-}
-
 /*
  * 函数名:void WIFI_Server_MODE()
  * 功能:设置服务器模式

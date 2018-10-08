@@ -26,4 +26,4 @@
  ../../include/mem.h ../../include/sntp.h ../../include/ip_addr.h \
  ../../include/espconn.h ../../include/smartconfig.h \
  ../../include/airkiss.h ../include/driver/key.h \
- ../include/driver/gpio16.h tcp.h ota.h
+ ../include/driver/gpio16.h ota.h udp_server.h

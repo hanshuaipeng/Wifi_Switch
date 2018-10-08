@@ -38,7 +38,11 @@ static void ICACHE_FLASH_ATTR wifi_check_ip(void *arg)
 		connect_sta=1;
 		os_sprintf(ack,"{\"cmd\":\"wifi_config_ok\",\"sid\":\"%s\",\"connect_sta\":%d}",dev_sid,connect_sta);
 
+#if tcp_server
 		WIFI_TCP_SendNews(ack,os_strlen(ack));
+#else
+		WIFI_UDP_SendNews(ack,os_strlen(ack));
+#endif
 		sys_restart();
 	}
 	if (wifiStatus == STATION_GOT_IP && ipConfig.ip.addr != 0)
@@ -54,11 +58,14 @@ static void ICACHE_FLASH_ATTR wifi_check_ip(void *arg)
 
 			INFO("STATION_WRONG_PASSWORD\r\n");
 			wifi_set_opmode(SOFTAP_MODE);
-			WIFIServerMode();
 			connect_sta=2;
 			//wifi_station_connect();
 			 os_sprintf(ack,"{\"cmd\":\"wifi_config_ok\",\"sid\":\"%s\",\"connect_sta\":%d}",dev_sid,connect_sta);
+#if tcp_server
 			WIFI_TCP_SendNews(ack,os_strlen(ack));
+#else
+			WIFI_UDP_SendNews(ack,os_strlen(ack));
+#endif
 
 		}
 		else if(wifi_station_get_connect_status() == STATION_NO_AP_FOUND)
@@ -66,21 +73,27 @@ static void ICACHE_FLASH_ATTR wifi_check_ip(void *arg)
 
 			INFO("STATION_NO_AP_FOUND\r\n");
 			wifi_set_opmode(SOFTAP_MODE);
-			WIFIServerMode();
 			//wifi_station_connect();
 			connect_sta=3;
 			 os_sprintf(ack,"{\"cmd\":\"wifi_config_ok\",\"sid\":\"%s\",\"connect_sta\":%d}",dev_sid,connect_sta);
+#if tcp_server
 			WIFI_TCP_SendNews(ack,os_strlen(ack));
+#else
+			WIFI_UDP_SendNews(ack,os_strlen(ack));
+#endif
 		}
 		else if(wifi_station_get_connect_status() == STATION_CONNECT_FAIL)
 		{
 
 			INFO("STATION_CONNECT_FAIL\r\n");
 			wifi_set_opmode(SOFTAP_MODE);
-			WIFIServerMode();
 			connect_sta=3;
 			 os_sprintf(ack,"{\"cmd\":\"wifi_config_ok\",\"sid\":\"%s\",\"connect_sta\":%d}",dev_sid,connect_sta);
+#if tcp_server
 			WIFI_TCP_SendNews(ack,os_strlen(ack));
+#else
+			WIFI_UDP_SendNews(ack,os_strlen(ack));
+#endif
 			//wifi_station_connect();
 
 		}
