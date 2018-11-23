@@ -35,7 +35,7 @@
 	#include "udp_server.h"
 #endif
 /**********************************************************************/
-#define SYS_VER  			"gp08-kg01-sw-v1.3"//版本号
+#define SYS_VER  			"gp08-kg01-sw-v1.2"//版本号
 #define HARD_VER  			"gp08-kg01-hw-v1.3"//版本号
 
 #define DEVICE_TYPE 		"gh_9e2cff3dfa51" //wechat public number
@@ -43,46 +43,77 @@
 
 #define DEFAULT_LAN_PORT 	12476
 
-//GPIO16->左侧按键->GPIO2
-//GPIO12->右侧按键->GPIO5
-//红色配网指示灯
-#define SMART_LED_PIN_NUM         15
-#define SMART_LED_PIN_FUNC        FUNC_GPIO15
-#define SMART_LED_PIN_MUX         PERIPHS_IO_MUX_MTDO_U
-//右侧按键，充当配网，左侧按键位GPIO16
-#define SMART_KEY_PIN_NUM         12
-#define SMART_KEY_PIN_FUNC        FUNC_GPIO12
-#define SMART_KEY_PIN_MUX         PERIPHS_IO_MUX_MTDI_U
-//继电器
-#define RELAY1_PIN_NUM         	  2
-#define RELAY1_PIN_FUNC        	  FUNC_GPIO2
-#define RELAY1_PIN_MUX         	  PERIPHS_IO_MUX_GPIO2_U
+/*******************************74HC595***************************/
+/* Q7   左侧灯
+ * Q6	继电器
+ * Q5	继电器
+ * Q2	右侧灯
+ *
+ */
+//SH_CP
+#define SCK_PIN_NUM         12
+#define SCK_PIN_FUNC        FUNC_GPIO12
+#define SCK_PIN_MUX         PERIPHS_IO_MUX_MTDI_U
+//ST_CP
+#define RCK_PIN_NUM         14
+#define RCK_PIN_FUNC        FUNC_GPIO14
+#define RCK_PIN_MUX         PERIPHS_IO_MUX_MTDO_U
+//DS
+#define DS_PIN_NUM          15
+#define DS_PIN_FUNC         FUNC_GPIO15
+#define DS_PIN_MUX          PERIPHS_IO_MUX_MTDO_U
 
-#define RELAY2_PIN_NUM         	  5
-#define RELAY2_PIN_FUNC        	  FUNC_GPIO5
-#define RELAY2_PIN_MUX         	  PERIPHS_IO_MUX_GPIO5_U
+//按键
+#define KEY1_PIN_NUM         2
+#define KEY1_PIN_FUNC        FUNC_GPIO2
+#define KEY1_PIN_MUX         PERIPHS_IO_MUX_GPIO2_U
 
+#define KEY2_PIN_NUM         5
+#define KEY2_PIN_FUNC        FUNC_GPIO5
+#define KEY2_PIN_MUX         PERIPHS_IO_MUX_GPIO5_U
+//蜂鸣器
+#define BEEP_PIN_NUM         13
+#define BEEP_PIN_FUNC        FUNC_GPIO13
+#define BEEP_PIN_MUX         PERIPHS_IO_MUX_MTCK_U
 
-#define Smart_LED_ON  GPIO_OUTPUT_SET(GPIO_ID_PIN(SMART_LED_PIN_NUM), 0);
-#define Smart_LED_OFF GPIO_OUTPUT_SET(GPIO_ID_PIN(SMART_LED_PIN_NUM), 1);
+//#define Smart_LED_ON  GPIO_OUTPUT_SET(GPIO_ID_PIN(SMART_LED_PIN_NUM), 0);
+//#define Smart_LED_OFF GPIO_OUTPUT_SET(GPIO_ID_PIN(SMART_LED_PIN_NUM), 1);
 
-#define RELAY1_ON  GPIO_OUTPUT_SET(GPIO_ID_PIN(RELAY1_PIN_NUM), 1);
-#define RELAY1_OFF GPIO_OUTPUT_SET(GPIO_ID_PIN(RELAY1_PIN_NUM), 0);
-#define RELAY2_ON  GPIO_OUTPUT_SET(GPIO_ID_PIN(RELAY2_PIN_NUM), 1);
-#define RELAY2_OFF GPIO_OUTPUT_SET(GPIO_ID_PIN(RELAY2_PIN_NUM), 0);
+/**********************************************************/
+#define SCK_HIGH 	GPIO_OUTPUT_SET(GPIO_ID_PIN(SCK_PIN_NUM), 1);
+#define SCK_LOW		GPIO_OUTPUT_SET(GPIO_ID_PIN(SCK_PIN_NUM), 0);
+
+#define RCK_HIGH	GPIO_OUTPUT_SET(GPIO_ID_PIN(RCK_PIN_NUM), 1);
+#define RCK_LOW	GPIO_OUTPUT_SET(GPIO_ID_PIN(RCK_PIN_NUM), 0);
+
+#define DS_HIGH		GPIO_OUTPUT_SET(GPIO_ID_PIN(DS_PIN_NUM), 1);
+#define DS_LOW		GPIO_OUTPUT_SET(GPIO_ID_PIN(DS_PIN_NUM), 0);
+/***********************************************************/
+#define BEEP_ON  	GPIO_OUTPUT_SET(GPIO_ID_PIN(BEEP_PIN_NUM), 1);
+#define BEEP_OFF 	GPIO_OUTPUT_SET(GPIO_ID_PIN(BEEP_PIN_NUM), 0);
+
+#define RELAY1_ON  	init_data|1<<6
+#define RELAY1_OFF 	init_data&0<<6
+#define RELAY2_ON  	init_data|1<<5
+#define RELAY2_OFF 	init_data&0<<5
+
+#define LED1_ON  	init_data|1<<7
+#define LED1_OFF 	init_data&0<<7
+#define LED2_ON  	init_data|1<<2
+#define LED2_OFF 	init_data&0<<2
 
 LOCAL os_timer_t flash_light_timer;
-LOCAL os_timer_t keyscan_timer;
 
+LOCAL os_timer_t serv_timer;
 uint8 mqtt_buff[200];				//mqtt接收数据缓存
 uint8 pub_topic[50],sub_topic[50];	//mqtt发布和订阅主题
 uint8 service_topic[80];			//向服务器返回状态主题
 uint8 pub_flag=0;
 uint8 on_off_flag=0;
-
+uint8 init_data=0x00;
 
 uint8 channel_sta[2];//[0]left,[1]right
-uint8 abc;
+uint8 send_serv;
 
 extern uint8 tcp_send;
 extern uint8 longpass_flag;
@@ -107,17 +138,30 @@ char temp_str[30];    // 临时子串，查找字符串相关
 LOCAL os_timer_t pub_timer;;
 LOCAL os_timer_t check_ip_timer;
 
-const airkiss_config_t akconf =
-{
-	(airkiss_memset_fn)&memset,
-	(airkiss_memcpy_fn)&memcpy,
-	(airkiss_memcmp_fn)&memcmp,
-	0,
-};
-
-
-
 void ICACHE_FLASH_ATTR  socket_timer_callback();
+/*************************74HC595***************************/
+void SendTo595(uint8 data)
+{
+	uint8 i=0;
+	uint8 vul=0;
+	for(i=0;i<8;i++)
+	{
+		vul=data>>7;
+		if(vul)
+		{
+			DS_HIGH;
+		}
+		else
+			DS_LOW;
+		data=data<<1;
+		os_delay_us(10);
+
+		SCK_LOW;
+	}
+	RCK_HIGH;
+	os_delay_us(10);
+	RCK_LOW;
+}
 /****************************************************************************
 						MQTT
 ******************************************************************************/
@@ -216,7 +260,6 @@ void mqttPublishedCb(uint32_t *args)
     MQTT_Client* client = (MQTT_Client*)args;
 
     pub_flag=0;
-    abc=1;
     os_memset(mqtt_buff,0,sizeof(mqtt_buff));
 #if 1
     INFO("MQTT: Published\r\n");
@@ -244,158 +287,6 @@ void mqttDataCb(uint32_t *args, const char* topic, uint32_t topic_len, const cha
     os_free(topicBuf);
     os_free(dataBuf);
 }
-
-#if smartconfig
-/******************************************************************************
- 	 	 	 	 	 	 	 	 SMART_CONFIG
- ******************************************************************************/
-
-
-
-LOCAL void ICACHE_FLASH_ATTR
-airkiss_wifilan_time_callback(void)
-{
-	uint16 i;
-	airkiss_lan_ret_t ret;
-
-	if ((udp_sent_cnt++) >5) {
-		udp_sent_cnt = 0;
-		os_timer_disarm(&ssdp_time_serv);//s
-		//return;
-	}
-
-	ssdp_udp.remote_port = DEFAULT_LAN_PORT;
-	ssdp_udp.remote_ip[0] = 255;
-	ssdp_udp.remote_ip[1] = 255;
-	ssdp_udp.remote_ip[2] = 255;
-	ssdp_udp.remote_ip[3] = 255;
-	lan_buf_len = sizeof(lan_buf);
-	ret = airkiss_lan_pack(AIRKISS_LAN_SSDP_NOTIFY_CMD,
-		DEVICE_TYPE, DEVICE_ID, 0, 0, lan_buf, &lan_buf_len, &akconf);
-	if (ret != AIRKISS_LAN_PAKE_READY) {
-		os_printf("Pack lan packet error!");
-		return;
-	}
-
-	ret = espconn_sendto(&pssdpudpconn, lan_buf, lan_buf_len);
-	if (ret != 0) {
-		os_printf("UDP send error!");
-	}
-	os_printf("Finish send notify!\n");
-}
-
-LOCAL void ICACHE_FLASH_ATTR
-airkiss_wifilan_recv_callbk(void *arg, char *pdata, unsigned short len)
-{
-	uint16 i;
-	remot_info* pcon_info = NULL;
-
-	airkiss_lan_ret_t ret = airkiss_lan_recv(pdata, len, &akconf);
-	airkiss_lan_ret_t packret;
-
-	switch (ret){
-	case AIRKISS_LAN_SSDP_REQ:
-		espconn_get_connection_info(&pssdpudpconn, &pcon_info, 0);
-		os_printf("remote ip: %d.%d.%d.%d \r\n",pcon_info->remote_ip[0],pcon_info->remote_ip[1],
-			                                    pcon_info->remote_ip[2],pcon_info->remote_ip[3]);
-		os_printf("remote port: %d \r\n",pcon_info->remote_port);
-
-        pssdpudpconn.proto.udp->remote_port = pcon_info->remote_port;
-		os_memcpy(pssdpudpconn.proto.udp->remote_ip,pcon_info->remote_ip,4);
-		ssdp_udp.remote_port = DEFAULT_LAN_PORT;
-
-		lan_buf_len = sizeof(lan_buf);
-		packret = airkiss_lan_pack(AIRKISS_LAN_SSDP_RESP_CMD,
-			DEVICE_TYPE, DEVICE_ID, 0, 0, lan_buf, &lan_buf_len, &akconf);
-
-		if (packret != AIRKISS_LAN_PAKE_READY) {
-			os_printf("Pack lan packet error!");
-			return;
-		}
-
-		os_printf("\r\n\r\n");
-		for (i=0; i<lan_buf_len; i++)
-			os_printf("%c",lan_buf[i]);
-		os_printf("\r\n\r\n");
-
-		packret = espconn_sendto(&pssdpudpconn, lan_buf, lan_buf_len);
-		if (packret != 0) {
-			os_printf("LAN UDP Send err!");
-		}
-
-		break;
-	default:
-		os_printf("Pack is not ssdq req!%d\r\n",ret);
-		break;
-	}
-}
-
-void ICACHE_FLASH_ATTR
-airkiss_start_discover(void)
-{
-	ssdp_udp.local_port = DEFAULT_LAN_PORT;
-	pssdpudpconn.type = ESPCONN_UDP;
-	pssdpudpconn.proto.udp = &(ssdp_udp);
-	espconn_regist_recvcb(&pssdpudpconn, airkiss_wifilan_recv_callbk);
-	espconn_create(&pssdpudpconn);
-
-	os_timer_disarm(&ssdp_time_serv);
-	os_timer_setfn(&ssdp_time_serv, (os_timer_func_t *)airkiss_wifilan_time_callback, NULL);
-	os_timer_arm(&ssdp_time_serv, 1000, 1);//1s
-}
-
-
-void ICACHE_FLASH_ATTR
-smartconfig_done(sc_status status, void *pdata)
-{
-    switch(status) {
-        case SC_STATUS_WAIT:
-            os_printf("SC_STATUS_WAIT\n");
-            break;
-        case SC_STATUS_FIND_CHANNEL:
-            os_printf("SC_STATUS_FIND_CHANNEL\n");
-            Smart_LED_OFF;
-            MQTT_Disconnect(&mqttClient);
-            break;
-        case SC_STATUS_GETTING_SSID_PSWD:
-            os_printf("SC_STATUS_GETTING_SSID_PSWD\n");
-			sc_type *type = pdata;
-            if (*type == SC_TYPE_ESPTOUCH) {
-                os_printf("SC_TYPE:SC_TYPE_ESPTOUCH\n");
-            } else {
-                os_printf("SC_TYPE:SC_TYPE_AIRKISS\n");
-            }
-            break;
-        case SC_STATUS_LINK:
-            os_printf("SC_STATUS_LINK\n");
-            struct station_config *sta_conf = pdata;
-
-	        wifi_station_set_config(sta_conf);
-	        wifi_station_disconnect();
-	        wifi_station_connect();
-            break;
-        case SC_STATUS_LINK_OVER:
-            os_printf("SC_STATUS_LINK_OVER\n");
-            if (pdata != NULL) {
-				//SC_TYPE_ESPTOUCH
-                uint8 phone_ip[4] = {0};
-
-                os_memcpy(phone_ip, (uint8*)pdata, 4);
-                os_printf("Phone ip: %d.%d.%d.%d\n",phone_ip[0],phone_ip[1],phone_ip[2],phone_ip[3]);
-            } else {
-            	//SC_TYPE_AIRKISS - support airkiss v2.0
-				airkiss_start_discover();
-            }
-            Smart_LED_ON;
-            smartconfig_stop();
-            sys_restart();
-            break;
-    }
-
-}
-
-
-#endif
 /*
  * 函数名:void dhcps_lease()
  * 功能:分配ip范围
@@ -457,20 +348,26 @@ void  ICACHE_FLASH_ATTR load_flash(uint32 des_addr,uint32* data)
 	spi_flash_read(des_addr * SPI_FLASH_SEC_SIZE,data, sizeof(data));
 }
 
+void ICACHE_FLASH_ATTR  serv_timer_callback()//用于发送状态给服务器，服务器保存当前状态
+{
+	send_serv=1;
+	os_timer_disarm(&serv_timer);
+	os_printf("send to serv\r\n");
+}
 /****************************************收到数据开始处理*******************************************/
 void ICACHE_FLASH_ATTR  pub_timer_callback()
 {
 	uint8 frist_pos=0;
 	uint16 data=0;
-	uint8 pub_buff[200];		//发布数据缓存
+	static uint8 pub_buff[200];		//发布数据缓存
 	static uint8 state1[10];
 	static uint8 state2[10];
 	static uint8 ip[4]={192,168,1,3};
-	os_memset(state1,0,os_strlen(state1));
-	os_memset(state2,0,os_strlen(state2));
 	if(pub_flag==1)
 	{
 		pub_flag=0;
+		os_memset(state1,0,os_strlen(state1));
+		os_memset(state2,0,os_strlen(state2));
 		os_memset(pub_buff,0,os_strlen(pub_buff));
 		if(strstr(mqtt_buff,dev_sid)!=NULL)
 		{
@@ -537,23 +434,31 @@ void ICACHE_FLASH_ATTR  pub_timer_callback()
 	{
 		if(channel_sta[0]==0)
 		{
-			RELAY1_OFF;
+			//RELAY1_OFF;
+			SendTo595(RELAY1_OFF);
+			SendTo595(LED1_OFF);
 			os_strcpy(state1,"\"off\"");
 		}
 		else
 		{
 			os_strcpy(state1,"\"on\"");
-			RELAY1_ON;
+			SendTo595(RELAY1_ON);
+			SendTo595(LED1_ON);
+			SendTo595(LED2_OFF);
+			//RELAY1_ON;
 		}
 		if(channel_sta[1]==0)
 		{
-			RELAY2_OFF;
+			//RELAY2_OFF;
+			SendTo595(RELAY2_OFF);
 			os_strcpy(state2,"\"off\"");
 		}
 		else
 		{
 			os_strcpy(state2,"\"on\"");
-			RELAY2_ON;
+			SendTo595(RELAY2_ON);
+			SendTo595(LED2_ON);
+			//RELAY2_ON;
 		}
 
 		os_sprintf(pub_buff,"{\"cmd\":\"wifi_switch_ack\",\"channel_1\":%s,\"channel_2\":%s,\"sys_ver\":\"%s\",\"hard_ver\":\"%s\",\"sid\":\"%s\"}",state1,state2,SYS_VER,HARD_VER,dev_sid);
@@ -566,12 +471,10 @@ void ICACHE_FLASH_ATTR  pub_timer_callback()
 #else
 			WIFI_UDP_SendNews(pub_buff,os_strlen(pub_buff));
 #endif
-			//***************************向服务器**************************************/
-			if(abc==1)
-			{
-				MQTT_Publish(&mqttClient,  service_topic,pub_buff, os_strlen(pub_buff), 0, 0);
-				abc=0;
-			}
+			//***********向服务器，3S后发送数据给服务器保存数据，连续触发UDP开关后，会不断刷新清零定时器*************************/
+			os_timer_disarm(&serv_timer);
+			os_timer_setfn(&serv_timer, (os_timer_func_t *)serv_timer_callback, NULL);
+			os_timer_arm(&serv_timer, 3000, 1);//3000ms
 			//****************************************************************/
 		}
 		else
@@ -579,6 +482,11 @@ void ICACHE_FLASH_ATTR  pub_timer_callback()
 
 		save_flash(CFG_LOCATION + 4,(uint32 *)&channel_sta);
 		on_off_flag=0;
+	}
+	if(send_serv==1)
+	{
+		MQTT_Publish(&mqttClient,  service_topic,pub_buff, os_strlen(pub_buff), 0, 0);
+		send_serv=0;
 	}
 
 }
@@ -589,12 +497,12 @@ void ICACHE_FLASH_ATTR  flash_light_timer_callback()
 	if(flag==0)
 	{
 		flag=1;
-		Smart_LED_OFF;
+		//Smart_LED_OFF;
 	}
 	else
 	{
 		flag=0;
-		Smart_LED_ON;
+		//Smart_LED_ON;
 	}
 }
 
@@ -609,7 +517,7 @@ static void Switch_LongPress_Handler( void )
 		wifi_set_opmode(STATION_MODE);
 		smartconfig_start(smartconfig_done);
 #endif
-		Smart_LED_OFF;
+		//Smart_LED_OFF;
 		os_timer_disarm(&sntp_timer);
 		os_timer_disarm(&check_ip_timer);
 /****************************配网指示灯开始闪烁*****************************************/
@@ -633,7 +541,6 @@ static void Switch_LongPress_Handler( void )
 //短按开启/断开开关
 static void Switch_ShortPress_Handler( void )
 {
-
 	pub_flag=1;
 	on_off_flag=1;
 	if(longpass_flag==2)
@@ -656,25 +563,53 @@ static void Switch_ShortPress_Handler( void )
 			channel_sta[1]=0;
 	}
 }
-
+void Switch_Short2Press_Handler()
+{
+	pub_flag=1;
+	on_off_flag=1;
+	if(longpass_flag==2)
+	{
+		longpass_flag=0;
+		system_restart();
+	}
+	if(longpass_flag==1)
+	{
+		longpass_flag=2;
+	}
+	else
+	{
+		os_printf("short pass \n");
+		if(channel_sta[0]==0)
+		{
+			channel_sta[0]=1;
+		}
+		else
+			channel_sta[0]=0;
+	}
+}
 void gpio_init(void)
 {
-	 PIN_FUNC_SELECT(SMART_LED_PIN_MUX,SMART_LED_PIN_FUNC);//LED
-	 PIN_FUNC_SELECT(RELAY1_PIN_MUX,RELAY1_PIN_FUNC);//RELAY1
-	 PIN_FUNC_SELECT(RELAY2_PIN_MUX,RELAY2_PIN_FUNC);//RELAY2
+	 PIN_FUNC_SELECT(SCK_PIN_MUX,SCK_PIN_FUNC);
+	 PIN_FUNC_SELECT(RCK_PIN_MUX,RCK_PIN_FUNC);
+	 PIN_FUNC_SELECT(DS_PIN_MUX,DS_PIN_FUNC);
+	 PIN_FUNC_SELECT(BEEP_PIN_MUX,BEEP_PIN_FUNC);
+
 	 //按键配置
-	switch_signle = key_init_single( SMART_KEY_PIN_NUM, SMART_KEY_PIN_MUX,
-									 SMART_KEY_PIN_FUNC,
-									  &Switch_LongPress_Handler ,
+	switch_signle = key_init_single( KEY1_PIN_NUM, KEY1_PIN_MUX,
+									 KEY1_PIN_FUNC,
+									 &Switch_LongPress_Handler ,
 									 &Switch_ShortPress_Handler
 									  );
-	 switch_param.key_num = 1;
+	switch_signle = key_init_single( KEY2_PIN_NUM, KEY2_PIN_MUX,
+										 KEY2_PIN_FUNC,
+										 &Switch_LongPress_Handler ,
+										 &Switch_Short2Press_Handler
+										  );
+	 switch_param.key_num = 2;
 	 switch_param.single_key = &switch_signle;
 	 key_init( &switch_param );
 
-	 gpio16_input_conf();
-
-	 Smart_LED_ON;
+	 //Smart_LED_ON;
 }
 
 
@@ -834,25 +769,7 @@ user_rf_cal_sector_set(void)
     return rf_cal_sec;
 }
 
-void  ICACHE_FLASH_ATTR keyscan_timer_timer_callback()
-{
-	static uint8 short_pass=0;
-	if(gpio16_input_get()==0&&short_pass==0)
-	{
-		short_pass=1;
-	}
-	if(short_pass==1&&gpio16_input_get()==1)
-	{
-		short_pass=0;
-		on_off_flag=1;
-		if(channel_sta[0]==1)
-		{
-			channel_sta[0]=0;
-		}
-		else
-			channel_sta[0]=1;
-	}
-}
+
 
 void  ICACHE_FLASH_ATTR to_scan(void)
 {
@@ -861,9 +778,6 @@ void  ICACHE_FLASH_ATTR to_scan(void)
 	os_timer_setfn(&pub_timer, (os_timer_func_t *)pub_timer_callback, NULL);
 	os_timer_arm(&pub_timer, 200, 1);//200ms
 
-	os_timer_disarm(&keyscan_timer);
-	os_timer_setfn(&keyscan_timer, (os_timer_func_t *)keyscan_timer_timer_callback, NULL);
-	os_timer_arm(&keyscan_timer, 10, 1);//10ms
 
 }
 /* Create a bunch of objects as demonstration. */
@@ -884,7 +798,7 @@ void user_init(void)
 
 	gpio_init();
 
-	load_flash(CFG_LOCATION + 4,(uint32 *)channel_sta);
+	//load_flash(CFG_LOCATION + 4,(uint32 *)channel_sta);
 
 	on_off_flag=1;
 	
@@ -896,8 +810,8 @@ void user_init(void)
 
    	system_init_done_cb(to_scan);
 	INFO("\r\nSystem started ...\r\n");
-	os_printf("SYS_Ver is %s\r\n",SYS_VER);
-	os_printf("Hard_Ver is %s\r\n",HARD_VER);
+	/*os_printf("SYS_Ver is %s\r\n",SYS_VER);
+	os_printf("Hard_Ver is %s\r\n",HARD_VER);*/
 }
 
 

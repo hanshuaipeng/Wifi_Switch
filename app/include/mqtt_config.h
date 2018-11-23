@@ -13,12 +13,12 @@ typedef enum{
 
 /*IMPORTANT: the following configuration maybe need modified*/
 /***********************************************************************************************************************/
-#define CFG_HOLDER    0x00FF55A8    /* Change this value to load default configurations */
+#define CFG_HOLDER    0x00FF55A6    /* Change this value to load default configurations */
 
 /*DEFAULT CONFIGURATIONS*/
 
-#define MQTT_HOST            "192.168.1.3"
-#define MQTT_PORT            3000
+#define MQTT_HOST            "192.168.31.41"
+#define MQTT_PORT            1883
 
 //#define MQTT_HOST            "broker.hivemq.com" // the IP address or domain name of your MQTT server or MQTT broker ,such as "mqtt.yourdomain.com"
 //#define MQTT_PORT            1883    // the listening port of your MQTT server or MQTT broker

@@ -71,8 +71,8 @@ void ICACHE_FLASH_ATTR ota_start_Upgrade(const char *server_ip, uint16_t port,co
     update->check_cb = ota_finished_callback;
     //设置定时回调时间
     update->check_times = 10000;
-    //从 4M *1024 =4096申请内存
-    update->url = (uint8 *)os_zalloc(4096);
+    //申请内存
+    update->url = (uint8 *)os_zalloc(512);
 #if 1
     //打印下請求地址
     os_printf("Http Server Address:%d.%d.%d.%d ,port: %d,filePath: %s,fileName: %s \n",
