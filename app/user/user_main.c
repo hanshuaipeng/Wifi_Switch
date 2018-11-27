@@ -35,8 +35,8 @@
 	#include "udp_server.h"
 #endif
 /**********************************************************************/
-#define SYS_VER  			"gp08-dhkg01-sw-v1.2"//版本号
-#define HARD_VER  			"gp08-dhkg01-hw-v1.4"//版本号
+#define SYS_VER  			"gp08-slkg01-sw-v1.2"//版本号
+#define HARD_VER  			"gp08-slkg01-hw-v1.4"//版本号
 
 #define DEVICE_TYPE 		"gh_9e2cff3dfa51" //wechat public number
 #define DEVICE_ID 			"122475" //model ID
@@ -99,15 +99,19 @@
 #define POWER_ON  	GPIO_OUTPUT_SET(GPIO_ID_PIN(POWER_PIN_NUM), 0);
 #define POWER_OFF 	GPIO_OUTPUT_SET(GPIO_ID_PIN(POWER_PIN_NUM), 1);
 
-#define RELAY1_ON  	(1<<6)
-#define RELAY1_OFF 	~(1<<6)
+#define RELAY1_ON  	(1<<4)
+#define RELAY1_OFF 	~(1<<4)
 #define RELAY2_ON  	(1<<5)
 #define RELAY2_OFF 	~(1<<5)
+#define RELAY3_ON  	(1<<6)
+#define RELAY3_OFF 	~(1<<6)
 
-#define LED1_ON  	~(1<<7)
-#define LED1_OFF 	(1<<7)
+#define LED1_ON  	~(1<<1)
+#define LED1_OFF 	(1<<1)
 #define LED2_ON  	~(1<<2)
 #define LED2_OFF 	(1<<2)
+#define LED3_ON  	~(1<<7)
+#define LED3_OFF 	(1<<7)
 
 LOCAL os_timer_t flash_light_timer;
 
@@ -118,12 +122,12 @@ uint8 service_topic[80];			//向服务器返回状态主题
 uint8 pub_flag=0;
 uint8 on_off_flag=0;
 uint8 send595_data=0x00;
-uint8 key1_pass=0,key2_pass=0;
+uint8 key1_pass=0,key2_pass=0,key3_pass=0;
 uint8 long_pass=0;
 uint8 first_in=0;
 
 
-uint8 channel_sta[2];//[0]left,[1]right
+uint8 channel_sta[3];//[0]left,[1]right
 uint8 send_serv;
 
 extern uint8 tcp_send;
@@ -247,7 +251,7 @@ void ICACHE_FLASH_ATTR  wifiConnectCb(uint8_t status)
 void mqttConnectedCb(uint32_t *args)
 {
 	uint8 init_buff[200];
-	os_sprintf(init_buff,"{\"cmd\":\"i am ok\",\"dev\":\"switchdh\",\"sys_ver\":\"%s\",\"hard_ver\":\"%s\",\"sid\":\"%s\"}",SYS_VER,HARD_VER,dev_sid);
+	os_sprintf(init_buff,"{\"cmd\":\"i am ok\",\"dev\":\"switchsl\",\"sys_ver\":\"%s\",\"hard_ver\":\"%s\",\"sid\":\"%s\"}",SYS_VER,HARD_VER,dev_sid);
     MQTT_Client* client = (MQTT_Client*)args;
 #if 1
     INFO("MQTT: Connected\r\n");
@@ -343,7 +347,7 @@ void ICACHE_FLASH_ATTR WIFIAPInit()
 	  apConfig.ssid_len=0;                      //设置ssid长度
 	  os_memset(apConfig.ssid,' ',strlen(apConfig.ssid));
 
-	  os_sprintf(apConfig.ssid,"grasp_switchdh-%s",dev_sid);			//设置ssid名字
+	  os_sprintf(apConfig.ssid,"grasp_switchsl-%s",dev_sid);			//设置ssid名字
 
 	 // os_strcpy(apConfig.password,"12345678");  //设置密码
 	 // apConfig.authmode =3;                     //设置加密模式
@@ -375,6 +379,7 @@ void ICACHE_FLASH_ATTR  pub_timer_callback()
 	static uint8 pub_buff[200];		//发布数据缓存
 	static uint8 state1[10];
 	static uint8 state2[10];
+	static uint8 state3[10];
 	static uint8 ip[4]={192,168,1,3};
 	if(pub_flag==1)
 	{
@@ -385,14 +390,14 @@ void ICACHE_FLASH_ATTR  pub_timer_callback()
 		if(strstr(mqtt_buff,dev_sid)!=NULL)
 		{
 /************************************读开关状态************************************************************/
-			if(strstr(mqtt_buff,"\"cmd\":\"wifi_switchdh_read\"")!=NULL)
+			if(strstr(mqtt_buff,"\"cmd\":\"wifi_switchsl_read\"")!=NULL)
 			{
 				on_off_flag=1;
 			}
 /*****************************************ota**********************************************************/
-			if(strstr(mqtt_buff,"\"cmd\":\"wifi_switchdh_update\"")!=NULL)
+			if(strstr(mqtt_buff,"\"cmd\":\"wifi_switchsl_update\"")!=NULL)
 			{
-				os_sprintf(pub_buff,"{\"cmd\":\"wifi_switchdh_update_ack\",\"sid\":\"%s\"}",dev_sid);
+				os_sprintf(pub_buff,"{\"cmd\":\"wifi_switchsl_update_ack\",\"sid\":\"%s\"}",dev_sid);
 				if(tcp_send==1)
 				{
 					tcp_send=0;
@@ -404,7 +409,7 @@ void ICACHE_FLASH_ATTR  pub_timer_callback()
 				}
 				else
 					MQTT_Publish(&mqttClient,  pub_topic,pub_buff, os_strlen(pub_buff), 0, 0);
-				ota_start_Upgrade(ip, 80,"8266update/WiFi_Switchdh/");
+				ota_start_Upgrade(ip, 80,"8266update/WiFi_Switchsl/");
 			}
 /*********************************************获取IP*************************/
 			if(strstr(mqtt_buff,"\"cmd\":\"wifi_equipment_ping\"")!=NULL)
@@ -413,7 +418,7 @@ void ICACHE_FLASH_ATTR  pub_timer_callback()
 				MQTT_Publish(&mqttClient,  pub_topic,pub_buff, os_strlen(pub_buff), 0, 0);
 			}
 /************************************开关*****************************************/
-			if(strstr(mqtt_buff,"\"cmd\":\"wifi_switchdh\"")!=NULL)
+			if(strstr(mqtt_buff,"\"cmd\":\"wifi_switchsl\"")!=NULL)
 			{
 				frist_pos=GetSubStrPos(mqtt_buff,"\"channel\"");
 				data=mqtt_buff[frist_pos+10]-'0';
@@ -421,22 +426,30 @@ void ICACHE_FLASH_ATTR  pub_timer_callback()
 				{
 					if(data==1)
 					{
-						channel_sta[1]=1;
+						channel_sta[0]=1;
 					}
 					if(data==2)
 					{
-						channel_sta[0]=1;
+						channel_sta[1]=1;
+					}
+					if(data==3)
+					{
+						channel_sta[2]=1;
 					}
 				}
 				if(strstr(mqtt_buff,"\"off\"")!=NULL)
 				{
 					if(data==1)
 					{
-						channel_sta[1]=0;
+						channel_sta[0]=0;
 					}
 					if(data==2)
 					{
-						channel_sta[0]=0;
+						channel_sta[1]=0;
+					}
+					if(data==3)
+					{
+						channel_sta[2]=0;
 					}
 				}
 				on_off_flag=1;
@@ -449,29 +462,42 @@ void ICACHE_FLASH_ATTR  pub_timer_callback()
 		{
 			send595_data=send595_data|(LED1_OFF);
 			send595_data=send595_data&(RELAY1_OFF);
-			os_strcpy(state2,"\"off\"");
+			os_strcpy(state1,"\"off\"");
 		}
 		else
 		{
 			send595_data=send595_data&(LED1_ON);
 			send595_data=send595_data|(RELAY1_ON);
-			os_strcpy(state2,"\"on\"");
+			os_strcpy(state1,"\"on\"");
 		}
 		if(channel_sta[1]==0)//key2
 		{
 			send595_data=send595_data|(LED2_OFF);
 			send595_data=send595_data&(RELAY2_OFF);
-			os_strcpy(state1,"\"off\"");
+			os_strcpy(state2,"\"off\"");
 		}
 		else
 		{
-			os_strcpy(state1,"\"on\"");
+			os_strcpy(state2,"\"on\"");
 			send595_data=send595_data&(LED2_ON);
 			send595_data=send595_data|(RELAY2_ON);
 		}
+		if(channel_sta[2]==0)//key3
+		{
+			send595_data=send595_data|(LED3_OFF);
+			send595_data=send595_data&(RELAY3_OFF);
+			os_strcpy(state3,"\"off\"");
+		}
+		else
+		{
+			os_strcpy(state3,"\"on\"");
+			send595_data=send595_data&(LED3_ON);
+			send595_data=send595_data|(RELAY3_ON);
+		}
 		SendTo595(send595_data);
 		//os_printf("send595_data=%x\r\n",send595_data);
-		os_sprintf(pub_buff,"{\"cmd\":\"wifi_switchdh_ack\",\"channel_1\":%s,\"channel_2\":%s,\"sys_ver\":\"%s\",\"hard_ver\":\"%s\",\"sid\":\"%s\"}",state1,state2,SYS_VER,HARD_VER,dev_sid);
+		os_sprintf(pub_buff,"{\"cmd\":\"wifi_switchsl_ack\",\"channel_1\":%s,\"channel_2\":%s,\"channel_3\":%s,\"sys_ver\":\"%s\",\"hard_ver\":\"%s\",\"sid\":\"%s\"}"
+				,state1,state2,state3,SYS_VER,HARD_VER,dev_sid);
 		if(tcp_send==1)
 		{
 			tcp_send=0;
@@ -548,55 +574,6 @@ static void Switch_LongPress_Handler( void )
 
 }
 
-//短按开启/断开开关
-/*static void Switch_ShortPress_Handler( void )
-{
-	pub_flag=1;
-	on_off_flag=1;
-	if(longpass_flag==2)
-	{
-		longpass_flag=0;
-		system_restart();
-	}
-	if(longpass_flag==1)
-	{
-		longpass_flag=2;
-	}
-	else
-	{
-		os_printf("short pass1 \n");
-		if(channel_sta[1]==0)
-		{
-			channel_sta[1]=1;
-		}
-		else
-			channel_sta[1]=0;
-	}
-}
-void Switch_Short2Press_Handler()
-{
-	pub_flag=1;
-	on_off_flag=1;
-	if(longpass_flag==2)
-	{
-		longpass_flag=0;
-		system_restart();
-	}
-	if(longpass_flag==1)
-	{
-		longpass_flag=2;
-	}
-	else
-	{
-		os_printf("short pass2 \n");
-		if(channel_sta[0]==0)
-		{
-			channel_sta[0]=1;
-		}
-		else
-			channel_sta[0]=0;
-	}
-}*/
 void key_timer_callback()
 {
 	struct ip_info ipConfig;
@@ -607,6 +584,7 @@ void key_timer_callback()
 	if(long_pass==1)
 	{
 		long_pass=2;
+		key3_pass=0;
 		key2_pass=0;
 		key1_pass=0;
 		BEEP_OFF;
@@ -631,13 +609,14 @@ void key_timer_callback()
 			long_pass=0;
 			key1_pass=0;
 			key2_pass=0;
+			key3_pass=0;
 			system_restart();
 			return;
 		}
 		if(key1_pass==1)
 		{
 			key1_pass=0;
-			os_printf("key1 pass\n");
+			//os_printf("key1 pass\n");
 			if(channel_sta[0]==0)
 			{
 				channel_sta[0]=1;
@@ -648,13 +627,23 @@ void key_timer_callback()
 		else if(key2_pass==1)
 		{
 			key2_pass=0;
-			os_printf("key2 pass\n");
+			//os_printf("key2 pass\n");
 			if(channel_sta[1]==0)
 			{
 				channel_sta[1]=1;
 			}
 			else
 				channel_sta[1]=0;
+		}
+		else if(key3_pass==1)
+		{
+			key3_pass=0;
+			if(channel_sta[2]==0)
+			{
+				channel_sta[2]=1;
+			}
+			else
+				channel_sta[2]=0;
 		}
 		pub_flag=1;
 		on_off_flag=1;
@@ -663,7 +652,8 @@ void key_timer_callback()
 void gpio_intr_handler()
 {
 	static uint32 time1=0,time2=0,err=0;
-	static uint16 i=0,num=500;
+	static uint16 i=0,delay=500;
+	static uint8 num=0,flag=0;
 	uint32 gpio_status = GPIO_REG_READ(GPIO_STATUS_ADDRESS);
 	ETS_GPIO_INTR_DISABLE();//关闭中断
 	if(first_in==0)
@@ -677,22 +667,54 @@ void gpio_intr_handler()
 		time2=system_get_time();
 		err=time2-time1;
 		//os_printf("time=%d\n",err);//输出1111
-		if(err<500&&key1_pass==0)
+		if(key1_pass==0&&key2_pass==0&&key3_pass==0)
 		{
-			key1_pass=1;
-			num=1000;
-			i=0;
+			if(err>1000&&err<3000)
+			{
+				if(flag==0)
+					flag=1;
+				else if(flag==1)
+				{
+					flag=2;
+				}
+			}
+			if(flag==1)
+			{
+				if(err<500)
+				{
+					num++;
+				}
+				else if(err>3000)
+				{
+					flag=0;
+					key1_pass=1;
+					delay=500;
+					os_printf("key1 pass\n");
+				}
+			}
+			if(flag==2)
+			{
+				flag=0;
+				if(num==2)
+				{
+					key2_pass=1;
+					delay=1000;
+					os_printf("key2 pass\n");
+				}
+				else if(num==3)
+				{
+					key3_pass=1;
+					delay=800;
+					os_printf("key3 pass\n");
+				}
+				//os_printf("i=%d\n",num);//输出1111
+				num=0;
+			}
 		}
-		if(err>4000&&key2_pass==0)
+
+		if(--delay==0)
 		{
-			key2_pass=1;
-			num=500;
-			i=0;
-		}
-		i++;
-		if(i>num)
-		{
-			i=0;
+			delay=500;
 			BEEP_ON;
 			long_pass=1;
 		}
@@ -783,9 +805,9 @@ int  ICACHE_FLASH_ATTR GetSubStrPos(char *str1,char *str2)
  **********************************/
 void  ICACHE_FLASH_ATTR MQTT_Init()
 {
-	os_sprintf(sub_topic,"iotbroad/iot/switchdh/%s",dev_sid);
-	os_sprintf(pub_topic,"iotbroad/iot/switchdh_ack/%s",dev_sid);
-	os_sprintf(service_topic,"iotbroad/iot/dev/switchdh_ack/%s",dev_sid);
+	os_sprintf(sub_topic,"iotbroad/iot/switchsl/%s",dev_sid);
+	os_sprintf(pub_topic,"iotbroad/iot/switchsl_ack/%s",dev_sid);
+	os_sprintf(service_topic,"iotbroad/iot/dev/switchsl_ack/%s",dev_sid);
 	MQTT_InitConnection(&mqttClient, sysCfg.mqtt_host, sysCfg.mqtt_port, sysCfg.security);
 
 	MQTT_InitClient(&mqttClient, sysCfg.device_id, sysCfg.mqtt_user, sysCfg.mqtt_pass, sysCfg.mqtt_keepalive, 1);

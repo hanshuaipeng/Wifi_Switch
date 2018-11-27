@@ -25,7 +25,7 @@ void ICACHE_FLASH_ATTR ota_finished_callback(void* arg)
 	        system_upgrade_reboot();
 	    }else{
 	        os_printf("OTA failed!\n");
-	        os_sprintf(buff,"{\"cmd\":\"wifi_switchdh_updatefail_ack\",\"sid\":\"%s\"}",dev_sid);
+	        os_sprintf(buff,"{\"cmd\":\"wifi_switchsl_updatefail_ack\",\"sid\":\"%s\"}",dev_sid);
 	        MQTT_Publish(&mqttClient,  pub_topic,buff, os_strlen(buff), 0, 0);
 	    }
 }
