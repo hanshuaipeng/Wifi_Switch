@@ -99,19 +99,19 @@
 #define POWER_ON  	GPIO_OUTPUT_SET(GPIO_ID_PIN(POWER_PIN_NUM), 0);
 #define POWER_OFF 	GPIO_OUTPUT_SET(GPIO_ID_PIN(POWER_PIN_NUM), 1);
 
-#define RELAY1_ON  	(1<<4)
-#define RELAY1_OFF 	~(1<<4)
+#define RELAY1_ON  	(1<<6)
+#define RELAY1_OFF 	~(1<<6)
 #define RELAY2_ON  	(1<<5)
 #define RELAY2_OFF 	~(1<<5)
-#define RELAY3_ON  	(1<<6)
-#define RELAY3_OFF 	~(1<<6)
+#define RELAY3_ON  	(1<<4)
+#define RELAY3_OFF 	~(1<<4)
 
-#define LED1_ON  	~(1<<1)
-#define LED1_OFF 	(1<<1)
+#define LED1_ON  	~(1<<6)
+#define LED1_OFF 	(1<<6)
 #define LED2_ON  	~(1<<2)
 #define LED2_OFF 	(1<<2)
-#define LED3_ON  	~(1<<7)
-#define LED3_OFF 	(1<<7)
+#define LED3_ON  	~(1<<1)
+#define LED3_OFF 	(1<<1)
 
 LOCAL os_timer_t flash_light_timer;
 
@@ -687,9 +687,9 @@ void gpio_intr_handler()
 				else if(err>3000)
 				{
 					flag=0;
-					key1_pass=1;
+					key3_pass=1;
 					delay=500;
-					os_printf("key1 pass\n");
+					os_printf("key3 pass\n");
 				}
 			}
 			if(flag==2)
@@ -703,9 +703,9 @@ void gpio_intr_handler()
 				}
 				else if(num==3)
 				{
-					key3_pass=1;
+					key1_pass=1;
 					delay=800;
-					os_printf("key3 pass\n");
+					os_printf("key1 pass\n");
 				}
 				//os_printf("i=%d\n",num);//Êä³ö1111
 				num=0;
