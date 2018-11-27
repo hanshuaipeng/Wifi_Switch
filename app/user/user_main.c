@@ -106,8 +106,8 @@
 #define RELAY3_ON  	(1<<4)
 #define RELAY3_OFF 	~(1<<4)
 
-#define LED1_ON  	~(1<<6)
-#define LED1_OFF 	(1<<6)
+#define LED1_ON  	~(1<<7)
+#define LED1_OFF 	(1<<7)
 #define LED2_ON  	~(1<<2)
 #define LED2_OFF 	(1<<2)
 #define LED3_ON  	~(1<<1)
@@ -922,6 +922,7 @@ void  ICACHE_FLASH_ATTR to_scan(void)
 	os_timer_disarm(&pub_timer);
 	os_timer_setfn(&pub_timer, (os_timer_func_t *)pub_timer_callback, NULL);
 	os_timer_arm(&pub_timer, 200, 1);//200ms
+	BEEP_OFF;
 }
 /* Create a bunch of objects as demonstration. */
 
