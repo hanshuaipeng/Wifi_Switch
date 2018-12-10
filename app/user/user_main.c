@@ -116,7 +116,44 @@ const airkiss_config_t akconf =
 };
 
 
+//CRC16
+//CRC高位前，低位后
+uint16 ICACHE_FLASH_ATTR Ar_crc_16(uint8 *input,uint16 len)
+{
+	uint16 n = 0;
+	uint8 m=0;
+	uint16 crc_in = 0;
+	uint16 crc_re = 0xffff;
+	uint16 poly = 0xa001;
+	uint16 xor_out = 0x0000;
 
+    crc_in = input[len - 2] * 256 + input[len - 1];
+    //os_printf("crc_in=0x%x\r\n",crc_in);
+	for(n=0;n<(len-2);n++)
+	{
+		crc_re = crc_re ^ input[n];
+		for(m=0;m<8;m++)
+		{
+			if(crc_re & 1)
+			{
+				crc_re >>= 1;
+				crc_re = crc_re ^ poly;
+			}
+			else
+			{
+				crc_re >>= 1;
+			}
+		}
+	}
+	crc_re = crc_re ^ xor_out;
+	//os_printf("crc_re=0x%x\r\n",crc_re);
+	if((crc_in == crc_re)||(crc_in == 0)){
+		return crc_re;
+	}
+	else{
+		return 0;
+	}
+}
 void ICACHE_FLASH_ATTR  socket_timer_callback();
 /****************************************************************************
 						MQTT
@@ -223,23 +260,102 @@ void mqttPublishedCb(uint32_t *args)
 #endif
 }
 
+void ICACHE_FLASH_ATTR CharToByte(uint8* pChar,uint8* pByte)
+{
+	uint8 h,l;
+	h=pChar[0];
+	l=pChar[1];
+	if(l>='0' && l<='9')
+		l=l-'0';
+	else if(l>='a' && l<='f')
+		l=l-'a'+0xa;
+	else if(l>='A' && l<='F')
+		l=l-'A'+0xa;
+	if(h>='0'&&h<='9')
+		h=h-'0';
+	else if(h>='a' && h<='f')
+		h=h-'a'+0xa;
+	else if(h>='A' &&h <='F')
+		h=h-'A'+0xa;
+	*pByte=h*16+l;
+}
 void mqttDataCb(uint32_t *args, const char* topic, uint32_t topic_len, const char *data, uint32_t data_len)
 {
     char *topicBuf = (char*)os_zalloc(topic_len+1),
             *dataBuf = (char*)os_zalloc(data_len+1);
-
+    uint16 crcout=0;
+    uint16 len;
+    uint8 a[2];
     MQTT_Client* client = (MQTT_Client*)args;
 
     os_memcpy(topicBuf, topic, topic_len);
     topicBuf[topic_len] = 0;
-
-    os_memset(mqtt_buff,0,sizeof(mqtt_buff));
-    os_memcpy(dataBuf, data, data_len);
-    os_memcpy(mqtt_buff, data, data_len);
+    if(data_len>300)
+    {
+    	for(len=0;len<data_len/2;len++)
+    	{
+    		os_strncpy(a,data+len*2,2);
+    		CharToByte(a,dataBuf+len);
+    		//os_printf("data[%d]=%x\r\n",len,dataBuf[len]);
+    	}
+    	if(dataBuf[0]==0xa5)
+    	{
+    		len=dataBuf[1]*256+dataBuf[2];
+    		crcout=Ar_crc_16(dataBuf,len+6);
+    		if(crcout)
+			{
+    			switch(dataBuf[3])
+    			{
+					case 0x11:
+						spi_flash_erase_sector(0x77);
+						if(spi_flash_write(0x77000,(uint32*)dataBuf+1, len)==SPI_FLASH_RESULT_OK)
+						{
+							//system_restart();
+							//os_printf("1-1\r\n");
+						}
+						break;
+					case 0x12:
+						if(spi_flash_write(0x77000+500,(uint32*)dataBuf+1, len)==SPI_FLASH_RESULT_OK)
+						{
+							//system_restart();
+							//os_printf("1-1\r\n");
+						}
+						break;
+					case 0x21:
+						spi_flash_erase_sector(0x78);
+						if(spi_flash_write(0x78000,(uint32*)dataBuf+1, len)==SPI_FLASH_RESULT_OK)
+						{
+							//os_printf("2-1\r\n");
+						}
+						break;
+					case 0x22:
+						if(spi_flash_write(0x78000+500,(uint32*)dataBuf+1, len)==SPI_FLASH_RESULT_OK)
+						{
+							//os_printf("2-2\r\n");
+						}
+						break;
+					case 0x23:
+						if(spi_flash_write(0x78000+1000,(uint32*)dataBuf+1, len)==SPI_FLASH_RESULT_OK)
+						{
+							//os_printf("2-3\r\n");
+							system_restart();
+						}
+						break;
+					default :break;
+    			}
+			}
+    	}
+    }
+    else
+    {
+    	os_memcpy(dataBuf, data, data_len);
+    	os_memset(mqtt_buff,0,sizeof(mqtt_buff));
+		os_memcpy(mqtt_buff, data, data_len);
+		pub_flag=1;
+    }
     dataBuf[data_len] = 0;
-    pub_flag=1;
-#if 1
-    INFO("Receive topic: %s, data: %s \r\n", topicBuf, dataBuf);
+#if 0
+    INFO("Receive topic: %s, data: %s \r\n", topicBuf, data);
 #endif
     os_free(topicBuf);
     os_free(dataBuf);
@@ -898,6 +1014,7 @@ void user_init(void)
 	INFO("\r\nSystem started ...\r\n");
 	os_printf("SYS_Ver is %s\r\n",SYS_VER);
 	os_printf("Hard_Ver is %s\r\n",HARD_VER);
+	os_printf("dev_sid is %s\r\n",dev_sid);
 }
 
 
