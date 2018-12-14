@@ -99,15 +99,15 @@
 #define POWER_ON  	GPIO_OUTPUT_SET(GPIO_ID_PIN(POWER_PIN_NUM), 0);
 #define POWER_OFF 	GPIO_OUTPUT_SET(GPIO_ID_PIN(POWER_PIN_NUM), 1);
 
-#define RELAY1_ON  	(1<<6)
-#define RELAY1_OFF 	~(1<<6)
-#define RELAY2_ON  	(1<<5)
-#define RELAY2_OFF 	~(1<<5)
+#define RELAY2_ON  	(1<<6)
+#define RELAY2_OFF 	~(1<<6)
+#define RELAY1_ON  	(1<<5)
+#define RELAY1_OFF 	~(1<<5)
 
-#define LED1_ON  	~(1<<7)
-#define LED1_OFF 	(1<<7)
-#define LED2_ON  	~(1<<2)
-#define LED2_OFF 	(1<<2)
+#define LED2_ON  	~(1<<7)
+#define LED2_OFF 	(1<<7)
+#define LED1_ON  	~(1<<2)
+#define LED1_OFF 	(1<<2)
 
 LOCAL os_timer_t flash_light_timer;
 
@@ -679,13 +679,13 @@ void gpio_intr_handler()
 		//os_printf("time=%d\n",err);//Êä³ö1111
 		if(err<500&&key1_pass==0)
 		{
-			key1_pass=1;
+			key2_pass=1;
 			num=1000;
 			i=0;
 		}
-		if(err>4000&&key2_pass==0)
+		if(err>4000&&key1_pass==0)
 		{
-			key2_pass=1;
+			key1_pass=1;
 			num=500;
 			i=0;
 		}
